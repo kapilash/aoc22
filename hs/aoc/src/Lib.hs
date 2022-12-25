@@ -8,6 +8,10 @@ module Lib
     day4Puzzle1,
     day4Puzzle2,
     day5Puzzle1,
+    Day6P1(..),
+    updateDay6P1,
+    updateDay6P2,
+    areUnique,
     day2Puzzle2
     ) where
 
@@ -416,4 +420,29 @@ day5Puzzle1 f = do
    case (runParser d5ReadAll (D5P1 []) f input) of
     Left err -> print err
     Right v  -> print v
+
+data Day6P1 = Day6P1 Bool Int String
+            deriving (Show, Eq)
+
+areUnique :: [Char] -> Bool
+areUnique [] = True
+areUnique (x:xs) = if x `elem` xs then False else areUnique xs
+
+updateDay6P1 ::  Day6P1 -> Char -> Day6P1
+updateDay6P1 (Day6P1 True i s) c  = Day6P1 True i s
+updateDay6P1 (Day6P1 False i "") c = Day6P1 False (i + 1) [c]
+updateDay6P1 (Day6P1 False i s) c = let
+                                      newstr = if length s < 4 then s ++ [c] else (tail s) ++ [c]
+                                      found = areUnique newstr && (length newstr) == 4
+                                    in
+                                        Day6P1 found (i+1) newstr
+
+updateDay6P2 ::  Day6P1 -> Char -> Day6P1
+updateDay6P2 (Day6P1 True i s) c  = Day6P1 True i s
+updateDay6P2 (Day6P1 False i "") c = Day6P1 False (i + 1) [c]
+updateDay6P2 (Day6P1 False i s) c = let
+                                      newstr = if length s < 14 then s ++ [c] else (tail s) ++ [c]
+                                      found = areUnique newstr && (length newstr) == 14
+                                    in
+                                        Day6P1 found (i+1) newstr
 
