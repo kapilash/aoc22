@@ -5,6 +5,9 @@ module Lib
     day2Puzzle1,
     day3Puzzle1,
     day3Puzzle2,
+    day4Puzzle1,
+    day4Puzzle2,
+    day5Puzzle1,
     day2Puzzle2
     ) where
 
@@ -219,7 +222,7 @@ groupScore s = let
                 (curr, next) = Lst.splitAt 3 s
                 currValue = priority . Set.elemAt 0 $ commonChars curr
               in
-                case next of
+                 case next of
                    [] -> currValue
                    _ -> currValue + (groupScore next)
 
@@ -227,3 +230,190 @@ day3Puzzle2 :: FilePath -> IO ()
 day3Puzzle2 f = do
     input <- readFile f
     print $ groupScore (lines input)
+
+
+data D4P1 = D4P1 Int Int
+            deriving (Show, Eq)
+
+readNum :: Monad m => ParsecT String u m Int
+readNum = do
+    n <- many1 digit
+    return $ read n
+
+d4p1 :: Monad m => ParsecT String u m D4P1
+d4p1 = do
+    n1 <- readNum
+    char '-'
+    n2 <- readNum
+    return $ D4P1 n1 n2
+
+d4p1Pair :: Monad m => ParsecT String Int m ()
+d4p1Pair = do
+    d1 <- d4p1
+    char ','
+    d2 <- d4p1
+    eol
+    modifyState (\x -> x + (changeStateD4P1 d1 d2))
+    return ()
+
+isContained :: D4P1 -> D4P1 -> Bool
+isContained (D4P1 a b) (D4P1 c d) = ((a >= c) && (b <= d)) || ((a <= c) && (b >= d))
+
+isOverlap :: D4P1 -> D4P1 -> Bool
+isOverlap (D4P1 a b) (D4P1 c d) = ((a <= c) && (b >= c)) || ((a <= d) && (b >= c))
+
+changeStateD4P1 :: D4P1 -> D4P1 -> Int
+changeStateD4P1 d1 d2 = if (isContained d1 d2) then 1 else 0
+
+changeStateD4P2 :: D4P1 -> D4P1 -> Int
+changeStateD4P2 d1 d2 = if (isOverlap d1 d2) then 1 else 0
+
+d4p2Pair :: Monad m => ParsecT String Int m ()
+d4p2Pair = do
+    d1 <- d4p1
+    char ','
+    d2 <- d4p1
+    eol
+    modifyState (\x -> x + (changeStateD4P2 d1 d2))
+    return ()
+
+d4p2All :: Monad m => ParsecT String Int m Int
+d4p2All = do
+  many1 d4p2Pair
+  eof
+  i <- getState
+  return i
+
+day4Puzzle2 :: FilePath -> IO ()
+day4Puzzle2 f = do
+   input <- readFile f
+   case (runParser d4p2All 0 f input) of
+    Left err -> print err
+    Right v  -> print v
+
+
+d4p1All :: Monad m => ParsecT String Int m Int
+d4p1All = do
+  many1 d4p1Pair
+  eof
+  i <- getState
+  return i
+
+day4Puzzle1 :: FilePath -> IO ()
+day4Puzzle1 f = do
+   input <- readFile f
+   case (runParser d4p1All 0 f input) of
+    Left err -> print err
+    Right v  -> print v
+
+newtype D5P1 = D5P1 [[Char]] 
+            deriving (Show, Eq)
+
+type RawStacks = [[Maybe Char]]
+
+
+maybeChars :: [Maybe Char] -> [Char]
+maybeChars [] = []
+maybeChars (Nothing : xs) = maybeChars xs
+maybeChars ((Just c) : xs) = c : (maybeChars xs)
+
+rawStacksToStacks :: [[Maybe Char]] -> [[Char]]
+rawStacksToStacks ([]:_) = []
+rawStacksToStacks x = (maybeChars . map head $ x) : (rawStacksToStacks (map tail x))
+
+getHeads :: D5P1 -> [Char]
+getHeads (D5P1 s) = map head s
+
+d5crate :: Monad m => ParsecT String D5P1 m (Maybe Char)
+d5crate = do
+    char '['
+    c <- anyChar
+    char ']'
+    return (Just c)
+
+d5Empty :: Monad m => ParsecT String D5P1 m (Maybe Char)
+d5Empty = do
+    char ' '
+    char ' '
+    char ' '
+    return Nothing
+
+d5BoxOrEmpty :: Monad m => ParsecT String D5P1 m (Maybe Char)
+d5BoxOrEmpty =    d5crate <|> d5Empty
+
+d5ReadCrates :: Monad m => ParsecT String D5P1 m [Maybe Char]
+d5ReadCrates = do
+    line <- sepBy1 d5BoxOrEmpty (char ' ')
+    eol
+    return line
+
+d5NumberLine :: Monad m => ParsecT String D5P1 m ()
+d5NumberLine = do
+    many1 (char ' ' <|> digit)
+    eol
+    return ()
+
+d5EmptyLine :: Monad m => ParsecT String D5P1 m ()
+d5EmptyLine = do
+    many (char ' ')
+    eol
+    return ()
+
+d5Move :: Int -> Int -> Int -> D5P1 -> D5P1
+d5Move i from to (D5P1 stacks) = 
+    let
+       moved = d5MHelper' i (stacks !! from, stacks !! to)
+    in
+      D5P1 (d5MHelper2 0 moved (from,to) stacks)
+
+d5MHelper :: Int -> ([Char], [Char]) -> ([Char], [Char])
+d5MHelper 0 (from, to) = (from, to)
+d5MHelper i (from, to) = d5MHelper (i - 1) (tail from, (head from):to)
+
+d5MHelper2 :: Int -> ([Char], [Char]) -> (Int, Int) -> [[Char]] -> [[Char]]
+d5MHelper2 _ _ _ [] = []
+d5MHelper2 i (from, to) (fromI, toI) (curr:rest) = if i == fromI then
+                                                    from:(d5MHelper2 (i + 1) (from, to) (fromI, toI) rest)
+                                                  else if i == toI then
+                                                    to:(d5MHelper2 (i + 1) (from, to) (fromI, toI) rest)
+                                                  else
+                                                    curr:(d5MHelper2 (i + 1) (from, to) (fromI, toI) rest)
+
+d5MHelper' :: Int -> ([Char], [Char]) -> ([Char], [Char])
+d5MHelper' i (from, to) =  (drop i from, (take i from) ++ to)
+
+d5MoveLine :: Monad m => ParsecT String D5P1 m ()
+d5MoveLine = do
+    string "move "
+    i <- readNum
+    string " from "
+    from <- readNum
+    string " to "
+    to <- readNum
+    eol
+    modifyState (d5Move i (from - 1) (to - 1))
+    return ()
+
+d5ReadMoves :: Monad m => ParsecT String D5P1 m ()
+d5ReadMoves = do
+    many1 d5MoveLine
+    eof
+    return ()
+
+d5ReadAll :: Monad m => ParsecT String D5P1 m String
+d5ReadAll = do
+    matrix <- manyTill d5ReadCrates (try d5NumberLine)
+    many1 d5EmptyLine
+    putState $ D5P1 (rawStacksToStacks matrix)
+    d5ReadMoves
+    eof
+    s <- getState
+    return (getHeads s)
+
+day5Puzzle1 :: FilePath -> IO ()
+day5Puzzle1 f = do
+   input <- readFile f
+   case (runParser d5ReadAll (D5P1 []) f input) of
+    Left err -> print err
+    Right v  -> print v
+
